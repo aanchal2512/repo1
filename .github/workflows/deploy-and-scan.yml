@@ -1,0 +1,29 @@
+name: deploy-and-scan
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "replace this step with your real deploy"
+
+  autosect-scan:
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: AutoSect scan
+        continue-on-error: true
+        env:
+          AUTOSECT_TOKEN: ${{ secrets.AUTOSECT_TOKEN }}
+          AUTOSECT_ASSET_ID: "6aa7ba2277a686e7f84b9d3f"
+          AUTOSECT_API_URL: "https://employment-freeze-courtesy-zinc.trycloudflare.com"
+        run: |
+          f="$(mktemp)"
+          curl -fsSL --retry 3 --max-time 30 "$AUTOSECT_API_URL/api/ci/script/github" -o "$f" || { echo "::warning::Could not download the AutoSecT scan script. The build was not affected."; exit 0; }
+          got="$( (sha256sum "$f" 2>/dev/null || shasum -a 256 "$f") | cut -d' ' -f1 )"
+          [ "$got" = "7e379ca9e1def388f9e683e04ca94b71bd3472d43b64ebec0c9810f6f04f12df" ] || { echo "::warning::The AutoSecT scan script changed (checksum mismatch), so it was not run. Copy the latest step from AutoSecT. The build was not affected."; exit 0; }
+          bash "$f"
